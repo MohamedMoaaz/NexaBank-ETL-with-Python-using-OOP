@@ -1,0 +1,135 @@
+---
+customer_profiles:
+    customer_id:
+        type: str
+        regex: CUST\d{6}
+        format: CUST{i:06d}
+    name:
+        type: str
+    gender:
+        type: str
+        enum:
+            - Male
+            - Female
+    age:
+        type: int
+        range:
+            - 18
+            - 80
+    city:
+        type: str
+        list:
+            - Cairo
+            - Alexandria
+            - Riyadh
+            - Jeddah
+            - Dubai
+            - Abu Dhabi
+            - Casablanca
+            - Doha
+            - Beirut
+            - Sfax
+    account_open_date:
+        type: date
+        func: check_date
+        format: "%Y-%m-%d"
+    product_type:
+        type: str
+        enum:
+            - CreditCard
+            - Savings
+            - PremiumAccount
+    customer_tier:
+        type: str
+        enum:
+            - Gold
+            - Platinum
+            - Silver
+support_tickets:
+    ticket_id:
+        type: str
+        regex: TICKET\d{6}
+        format: TICKET{i:06d}
+    customer_id:
+        foreign: customer_profiles.customer_id
+    complaint_category:
+        type: str
+        enum:
+            - Unauthorized Transaction
+            - Delayed Refund
+            - Card Not Working
+            - Loan Application Rejected
+            - Account Locked
+            - Incorrect Charges
+            - Mobile App Issues
+            - Poor Customer Service
+            - ATM Withdrawal Failed
+            - KYC Verification Delay
+    complaint_date:
+        type: date
+        func: check_date
+        format: "%Y-%m-%d"
+    severity:
+        type: int
+        range:
+            - 0
+            - 10
+credit_cards_billing:
+    bill_id:
+        type: str
+        regex: BILL\d{7}
+        format: BILL{i:07d}
+    customer_id:
+        foreign: customer_profiles.customer_id
+    month:
+        type: date
+        func: check_date
+        format: "%Y-%m"
+    amount_due:
+        type: float
+        func: is_positive
+    amount_paid:
+        type: float
+        func: is_positive
+    payment_date:
+        type: date
+        func: check_date
+        format: "%Y-%m-%d"
+transactions:
+    sender:
+        foreign: customer_profiles.customer_id
+    receiver:
+        foreign: customer_profiles.customer_id
+    transaction_amount:
+        type: int
+        func: is_positive
+    transaction_date:
+        type: date
+        func: check_date
+        format: "%Y-%m-%d"
+loans:
+    customer_id:
+        foreign: customer_profiles.customer_id
+    loan_type:
+        type: str
+        enum:
+            - Personal Loan
+            - Auto Loan
+            - Home Loan
+            - Credit Card Loan
+            - Education Loan
+            - Business Loan
+            - Medical Loan
+            - Travel Loan
+            - Top-Up Loan
+            - Loan Against Deposit
+    amount_utilized:
+        type: int
+        func: is_positive
+    utilization_date:
+        type: date
+        func: check_date
+        format: "%Y-%m-%d"
+    loan_reason:
+        type: str
+        file: data/generated_1000_friend_and_formal_messages.txt
