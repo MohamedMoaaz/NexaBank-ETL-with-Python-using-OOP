@@ -1,3 +1,21 @@
+"""
+data_pipeline.py
+
+This module implements an end-to-end file processing pipeline that:
+- Loads and parses a YAML schema definition.
+- Monitors an input directory for new files matching the schema headers.
+- Extracts, validates, and transforms data files.
+- Uploads processed files to an HDFS container.
+- Tracks file statuses during the pipeline using a centralized handler.
+
+Key Components:
+- Extractor: Handles file reading and DataFrame extraction.
+- Validator: Validates data against a predefined schema.
+- Transformer: Transforms and saves valid data.
+- FolderStatusHandler: Tracks the validation and saving status of each file.
+- FileListener: Monitors a folder and triggers processing on file arrival.
+"""
+
 import os
 import yaml
 from pathlib import Path
@@ -10,6 +28,15 @@ from services.file_listener import FileListener
 
 
 def get_schema(filepath: str = "data/schema.yaml") -> dict[str]:
+    """
+    Load the YAML schema file.
+
+    Args:
+        filepath (str): Path to the schema YAML file.
+
+    Returns:
+        dict[str]: Dictionary mapping expected file headers to validation rules.
+    """
     try:
         with open(filepath) as fp:
             return yaml.safe_load(fp)
@@ -19,6 +46,16 @@ def get_schema(filepath: str = "data/schema.yaml") -> dict[str]:
 
 
 def filter_incoming_files(root: str, filter: tuple[str] = tuple()) -> list[str]:
+    """
+    Recursively scan a directory and collect file paths matching the given filter.
+
+    Args:
+        root (str): Root directory to scan.
+        filter (tuple[str]): Set of accepted file stem names (without extension).
+
+    Returns:
+        list[str]: List of matching file paths.
+    """
     incoming_files = []
     filter_set = set(filter)
 
@@ -32,12 +69,27 @@ def filter_incoming_files(root: str, filter: tuple[str] = tuple()) -> list[str]:
 
 
 def validation_error_callback(filepath: str, report: str) -> None:
+    """
+    Callback function invoked when validation fails.
+
+    Args:
+        filepath (str): Path to the file being validated.
+        report (str): Error report.
+    """
     print("ERROR")
     print(filepath)
     print(report)
 
 
 def validate_incoming_file(filepath: str) -> None:
+    """
+    Extract and validate an incoming file.
+
+    Updates the `STATUS` dictionary with the validation result.
+
+    Args:
+        filepath (str): Path to the file to validate.
+    """
     flag, df = Extractor.extract(filepath)
 
     if flag is True:
@@ -53,6 +105,12 @@ def validate_incoming_file(filepath: str) -> None:
 
 
 def transform_incoming_file(filepath: str) -> None:
+    """
+    Transform and upload the data file if it hasn't been saved already.
+
+    Args:
+        filepath (str): Path to the file to transform.
+    """
     if STATUS[filepath]["saved"] is True:
         print("[INFO] Already saved")
         return
@@ -61,12 +119,18 @@ def transform_incoming_file(filepath: str) -> None:
     Transformer.transform(df, filepath)
 
     print("[INFO] Upload to HDFS container")
-    is_uploaded = True
+    is_uploaded = True  # Simulate upload
     if is_uploaded:
         STATUS[filepath]["saved"] = True
 
 
 def process_incoming_file(filepath: str) -> None:
+    """
+    Validate and transform a single incoming file.
+
+    Args:
+        filepath (str): Path to the file to process.
+    """
     print(f"[INFO] Processing '{filepath}'")
 
     if STATUS[filepath]["valid"] is None:
@@ -79,9 +143,17 @@ def process_incoming_file(filepath: str) -> None:
 
 
 def process_stored_incoming_files(root: str) -> None:
+    """
+    Process all files already present in the incoming directory.
+
+    Args:
+        root (str): Root directory to scan and process files from.
+    """
     for filepath in filter_incoming_files(root, filter=HEADERS):
         process_incoming_file(filepath)
 
+
+# --- Pipeline Initialization ---
 
 ROOT_DIR = "./incoming_data"
 SCHEMA = get_schema()

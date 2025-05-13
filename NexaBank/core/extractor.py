@@ -1,3 +1,18 @@
+"""
+extractor.py
+
+This module defines the `Extractor` class, which provides a utility method
+to load structured data from various file formats into a pandas DataFrame.
+
+Supported file types:
+- CSV (.csv)
+- Pipe-delimited TXT (.txt)
+- JSON (.json, records-oriented)
+
+The `extract` method handles exceptions gracefully and returns a success flag
+along with the DataFrame (if extraction is successful).
+"""
+
 import pandas as pd
 import json
 from typing import Tuple
@@ -15,23 +30,21 @@ class Extractor:
         Extract data from a file into a pandas DataFrame.
 
         Args:
-            filepath: Path to the file to be extracted
+            filepath (str): Path to the file to be extracted.
 
         Returns:
-            Tuple containing:
-            - bool: Success flag (True if extraction successful, False otherwise)
-            - DataFrame: Extracted data if successful, None if failed
+            Tuple[bool, DataFrame | None]: 
+                - A boolean indicating success or failure.
+                - A pandas DataFrame if extraction was successful, otherwise None.
 
         Supported formats:
             - .txt: Pipe-delimited text files
             - .csv: Comma-separated values
             - .json: JSON files in records format
         """
-        # Extract file extension from filepath
         extension = filepath.split(".")[-1].lower()
 
         try:
-            # Use pattern matching to handle different file formats
             match extension:
                 case "txt":
                     df = pd.read_csv(filepath, delimiter="|")
@@ -66,14 +79,13 @@ class Extractor:
             print(f"[FAIL] Unexpected error: {e}")
             return (False, None)
 
-        # TODO: Add logging mechanism
         return (True, df)
 
 
 if __name__ == "__main__":
     # Example usage
-    filepath = "incoming_data/2025-04-18/14/customer_profiles.csv"
+    filepath = "incoming_data/2025-04-18/15/customer_profiles.csv"
     success, dataframe = Extractor.extract(filepath)
     print(f"[INFO] Extraction {'successful' if success else 'failed'}")
     if success:
-        print(dataframe.head())  # Display first few rows of the DataFrame
+        print(dataframe.head())

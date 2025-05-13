@@ -1,3 +1,19 @@
+"""
+validator.py
+
+This module defines the `Validator` class which validates a DataFrame against
+a structured schema. It supports:
+
+- Header and datatype validation
+- Value validation using range, enum, regex
+- Foreign schema resolution (reference to other schemas)
+- Custom function-based validations
+- Formatted error reporting and optional callback integration
+
+The schema must be defined as a nested dictionary, where each key represents a dataset,
+and each value describes column-level validation rules.
+"""
+
 import pandas as pd
 import re
 from copy import deepcopy
@@ -12,7 +28,10 @@ except ImportError:
 class Validator:
     """
     A class for validating DataFrame contents against predefined schemas.
-    Supports type checking, range validation, enum validation, and custom validation functions.
+
+    Attributes:
+        _base_schema (dict): A processed schema with compiled patterns and resolved ranges.
+        _error_callback (Callable): Optional callback function triggered on validation failure.
     """
 
     def __init__(
@@ -24,21 +43,26 @@ class Validator:
         Initialize validator with schema and optional error callback.
 
         Args:
-            base_schema: Dictionary containing validation rules for different data types
-            error_callback: Optional function to call when validation errors occur
+            base_schema (dict): Validation rules for each dataset type.
+            error_callback (Callable): Function to call on validation errors (optional).
         """
         self._base_schema: dict[str, dict] = self._process_schema(base_schema)
         self._error_callback: Callable[[str, str], None] = error_callback
 
     def _process_schema(self, base_schema: dict[str, dict]) -> dict[str, dict]:
         """
-        Process and prepare schema for validation.
-        Converts enums to sets, ranges to range objects, and compiles regex patterns.
+        Convert raw schema into a processed version for efficient validation.
+        Enums become sets, ranges become range objects, regexes are compiled.
+
+        Args:
+            base_schema (dict): The original schema dictionary.
+
+        Returns:
+            dict: A modified version ready for validation.
         """
         base_schema = deepcopy(base_schema)
 
         def _process_cfg(cfg: dict) -> None:
-            """Process individual configuration entries."""
             if "enum" in cfg:
                 cfg["enum"] = set(cfg["enum"])
             if "range" in cfg:
@@ -55,13 +79,13 @@ class Validator:
 
     def _get_foreign_schema(self, cfg: dict) -> dict:
         """
-        Resolve foreign schema references recursively.
+        Recursively resolve foreign schema references.
 
         Args:
-            cfg: Configuration dictionary containing foreign schema reference
+            cfg (dict): A column's configuration that contains a "foreign" reference.
 
         Returns:
-            Resolved schema configuration
+            dict: The resolved configuration from another schema.
         """
         entry, item = cfg["foreign"].split(".")
         foreign_schema = self._base_schema[entry][item]
@@ -73,21 +97,20 @@ class Validator:
 
     def _validate_header(self, df: pd.DataFrame, schema: dict) -> bool:
         """
-        Validate DataFrame headers and column types against schema.
+        Validate DataFrame column names and data types against the schema.
 
         Args:
-            df: DataFrame to validate
-            schema: Schema to validate against
+            df (pd.DataFrame): The DataFrame to check.
+            schema (dict): Schema definitions for the current dataset.
 
         Returns:
-            True if validation passes, False otherwise
+            bool: True if column names and data types are valid, else False.
         """
         DTYPE = {"float": "float64", "int": "int64"}
 
         try:
-            df[:] = df[schema.keys()]  # Validate and reorder--if needed
+            df[:] = df[schema.keys()]  # Ensure columns are present and ordered
 
-            # Check datatype of each column
             for (header, cfg), dtype in zip(schema.items(), df.dtypes):
                 type_ = (
                     cfg["type"]
@@ -99,19 +122,23 @@ class Validator:
                     print(f"[FAIL] {header} has incorrect datatype")
                     return False
 
-        except KeyError as e:
-            print(f"[FAIL] {e}")
-            return False
-        except IndexError as e:
-            print(f"[FAIL] {e}")
-            return False
-        except Exception as e:
+        except (KeyError, IndexError, Exception) as e:
             print(f"[FAIL] {e}")
             return False
 
         return True
 
     def _validate_row(self, row: pd.Series, schema: dict) -> dict:
+        """
+        Validate a single row against the schema.
+
+        Args:
+            row (pd.Series): A row from the DataFrame.
+            schema (dict): Schema definition.
+
+        Returns:
+            dict: A dictionary with field names and corresponding error messages.
+        """
         errors = {}
 
         def _run(value, cfg) -> dict:
@@ -141,7 +168,17 @@ class Validator:
 
         return errors
 
-    def _format_error(self, invalid_rows: pd.DataFrame, errors: pd.DataFrame):
+    def _format_error(self, invalid_rows: pd.DataFrame, errors: pd.Series) -> str:
+        """
+        Format validation errors into a readable report.
+
+        Args:
+            invalid_rows (pd.DataFrame): The invalid rows from the DataFrame.
+            errors (pd.Series): A series containing error dicts per row.
+
+        Returns:
+            str: A formatted string report.
+        """
         report_lines = []
 
         for idx, error_dict in errors.items():
@@ -154,28 +191,38 @@ class Validator:
         return "\n".join(report_lines)
 
     def validate(self, df: pd.DataFrame, filepath: str) -> bool:
+        """
+        Validate the given DataFrame against the inferred schema (based on filename).
+
+        Args:
+            df (pd.DataFrame): The data to validate.
+            filepath (str): Filepath used to infer schema key and for error reporting.
+
+        Returns:
+            bool: True if all rows are valid, False otherwise.
+        """
         key = filepath.replace("\\", "/").split("/")[-1].split(".")[0].lower()
         schema = self._base_schema[key]
 
         if not self._validate_header(df, schema):
             return False
 
-        errors = df.apply(
-            lambda row: self._validate_row(row, schema),
-            axis=1,
-        )
-
+        errors = df.apply(lambda row: self._validate_row(row, schema), axis=1)
         invalid_rows = df[errors.apply(bool)]
         errors = errors[errors.apply(bool)]
 
         if not errors.empty:
             report = self._format_error(invalid_rows, errors)
-            self._error_callback and self._error_callback(filepath, report)
+            if self._error_callback:
+                self._error_callback(filepath, report)
 
         return errors.empty
 
 
 if __name__ == "__main__":
+    """
+    Test harness to run validation on a sample file.
+    """
     import yaml
     from extractor import Extractor
 
