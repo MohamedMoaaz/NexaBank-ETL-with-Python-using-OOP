@@ -66,20 +66,10 @@ class Transformer:
             df (pd.DataFrame): DataFrame with customer profile data.
             filepath (str): Optional file path for extracting reference date.
         """
-        date = pd.to_datetime(Transformer._get_timestamp(filepath)["date"]) if filepath else pd.to_datetime("today")
-        account_open_date = pd.to_datetime(df["account_open_date"], errors="coerce")
-        tenure = (date - account_open_date).dt.days // 365.25
-        df["tenure"] = tenure.astype(int)
-
-        def classify_customer_segment(value):
-            if value > 5:
-                return "Loyal"
-            elif value < 1:
-                return "Newcomer"
-            return "Normal"
-
-        df["customer_segment"] = df["tenure"].apply(classify_customer_segment)
-
+        date = pd.to_datetime(Transformer._get_timestamp(filepath)["date"]) if filepath else pd.to_datetime("today")        
+        df["tenure"] = ((date.now() - pd.to_datetime(df["account_open_date"])).dt.days / 365).astype(int)
+        df["customer_segment"] = df["tenure"].apply(lambda x: "Loyal" if x > 5 else "Newcomer" if x < 1 else "Normal")
+        
     @staticmethod
     def _transform_support_tickets(df: pd.DataFrame, filepath: str = "") -> None:
         """
@@ -92,10 +82,9 @@ class Transformer:
             df (pd.DataFrame): Support ticket data.
             filepath (str): Optional path for extracting reference date.
         """
-        date = pd.to_datetime(Transformer._get_timestamp(filepath)["date"]) if filepath else pd.to_datetime("today")
-        complaint_date = pd.to_datetime(df["complaint_date"])
-        df["age"] = (date - complaint_date).dt.days.astype(int)
-
+        date = pd.to_datetime(Transformer._get_timestamp(filepath)["date"]) if filepath else pd.to_datetime("today")     
+        df["age"] = (date.now() - pd.to_datetime(df["complaint_date"])).dt.days
+        
     @staticmethod
     def _transform_credit_cards_billing(df: pd.DataFrame, filepath: str = "") -> None:
         """
@@ -112,12 +101,15 @@ class Transformer:
             df (pd.DataFrame): Credit card billing data.
             filepath (str): Optional (not used here).
         """
-        df["fully_paid"] = df["amount_due"] <= df["amount_paid"]
-        df["debt"] = (df["amount_due"] - df["amount_paid"]).clip(lower=0).astype(int)
-        due_date = pd.to_datetime(df["month"], format="%Y-%m")
-        df["late_days"] = (pd.to_datetime(df["payment_date"]) - due_date).dt.days
-        df["fine"] = df["late_days"].clip(lower=0) * 5.15
+        df["fully_paid"] = df["amount_paid"] <= df["amount_due"]
+        df["debt"] = df.apply(lambda row: 0 if row["fully_paid"] else row["amount_due"] - row["amount_paid"], axis=1)
+        df["due_date"] = pd.to_datetime(df["month"] + "-01")
+        df["payment_date"] = pd.to_datetime(df["payment_date"])
+        df["late_days"] = (df["payment_date"] - df["due_date"]).dt.days.astype(int)
+        df["fine"] = df["late_days"] * 5.15
         df["total_amount"] = df["amount_due"] + df["fine"]
+        
+
 
     @staticmethod
     def _transform_transactions(df: pd.DataFrame, filepath: str = "") -> None:
@@ -150,7 +142,7 @@ class Transformer:
         """
         date = pd.to_datetime(Transformer._get_timestamp(filepath)["date"]) if filepath else pd.to_datetime("today")
         utilization_date = pd.to_datetime(df["utilization_date"])
-        df["age"] = (date - utilization_date).dt.days.astype(int)
+        df["age"] = (date - utilization_date).dt.days
         df["total_cost"] = df["amount_utilized"] * 0.20 + 1000
 
     @staticmethod
@@ -186,7 +178,7 @@ if __name__ == "__main__":
     """
     from extractor import Extractor
 
-    filepath = "incoming_data/2025-04-29/21/customer_profiles.csv"
+    filepath = r"D:\ITI\Python\incoming_data\2025-04-18\14\support_tickets.csv"
     extractor = Extractor()
     flag, df = extractor.extract(filepath)
     print(f"[INFO] Extraction {'successful' if flag else 'failed'}")
