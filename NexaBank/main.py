@@ -23,8 +23,13 @@ from pathlib import Path
 from core.extractor import Extractor
 from core.validator import Validator
 from core.transformer import Transformer
+from core.loader import HdfsHandler
 from services.folder_status import FolderStatusHandler
 from services.file_listener import FileListener
+from services.email_client import EmailClient
+
+from dotenv import load_dotenv
+load_dotenv()
 
 
 def get_schema(filepath: str = "data/schema.yaml") -> dict[str]:
@@ -76,9 +81,7 @@ def validation_error_callback(filepath: str, report: str) -> None:
         filepath (str): Path to the file being validated.
         report (str): Error report.
     """
-    print("ERROR")
-    print(filepath)
-    print(report)
+    EMAIL.send(RECEIVER_EMAIL, filepath, report)
 
 
 def validate_incoming_file(filepath: str) -> None:
@@ -112,14 +115,14 @@ def transform_incoming_file(filepath: str) -> None:
         filepath (str): Path to the file to transform.
     """
     if STATUS[filepath]["saved"] is True:
-        print("[INFO] Already saved")
         return
 
     _, df = Extractor.extract(filepath)
     Transformer.transform(df, filepath)
 
-    print("[INFO] Upload to HDFS container")
-    is_uploaded = True  # Simulate upload
+    is_uploaded, log_message = LOADER.export_data(
+        df, filepath.replace("\\", "/").removeprefix("incoming_data/")
+    )
     if is_uploaded:
         STATUS[filepath]["saved"] = True
 
@@ -131,8 +134,6 @@ def process_incoming_file(filepath: str) -> None:
     Args:
         filepath (str): Path to the file to process.
     """
-    print(f"[INFO] Processing '{filepath}'")
-
     if STATUS[filepath]["valid"] is None:
         validate_incoming_file(filepath)
 
@@ -158,11 +159,17 @@ def process_stored_incoming_files(root: str) -> None:
 ROOT_DIR = "./incoming_data"
 SCHEMA = get_schema()
 HEADERS = tuple(SCHEMA.keys())
+RECEIVER_EMAIL = os.getenv("EMAIL_ADDRESS")
 
 STATUS = FolderStatusHandler(HEADERS)
-VALIDATOR = Validator(base_schema=SCHEMA, error_callback=validation_error_callback)
-
-FILE_LISTENER = FileListener(ROOT_DIR, filter=HEADERS, callback=process_incoming_file)
+VALIDATOR = Validator(
+    base_schema=SCHEMA, error_callback=validation_error_callback
+)
+LOADER = HdfsHandler("/user/hive/warehouse", "master1", "/tmp/hdfs_export")
+EMAIL = EmailClient()
+FILE_LISTENER = FileListener(
+    ROOT_DIR, filter=HEADERS, callback=process_incoming_file
+)
 FILE_LISTENER.start_thread()
 
 process_stored_incoming_files(root=ROOT_DIR)
