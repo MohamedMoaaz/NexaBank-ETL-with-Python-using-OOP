@@ -18,6 +18,7 @@ Key Components:
 
 import os
 import yaml
+import time
 from pathlib import Path
 
 from core.extractor import Extractor
@@ -29,6 +30,7 @@ from services.file_listener import FileListener
 from services.email_client import EmailClient
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
 
@@ -159,6 +161,7 @@ def process_stored_incoming_files(root: str) -> None:
 ROOT_DIR = "./incoming_data"
 SCHEMA = get_schema()
 HEADERS = tuple(SCHEMA.keys())
+EMAIL = EmailClient()
 RECEIVER_EMAIL = os.getenv("EMAIL_ADDRESS")
 
 STATUS = FolderStatusHandler(HEADERS)
@@ -166,10 +169,12 @@ VALIDATOR = Validator(
     base_schema=SCHEMA, error_callback=validation_error_callback
 )
 LOADER = HdfsHandler("/user/hive/warehouse", "master1", "/tmp/hdfs_export")
-EMAIL = EmailClient()
 FILE_LISTENER = FileListener(
     ROOT_DIR, filter=HEADERS, callback=process_incoming_file
 )
 FILE_LISTENER.start_thread()
 
 process_stored_incoming_files(root=ROOT_DIR)
+while True:
+    time.sleep(1)
+

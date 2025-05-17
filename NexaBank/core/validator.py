@@ -9,15 +9,24 @@ a structured schema. It supports:
 - Foreign schema resolution (reference to other schemas)
 - Custom function-based validations
 - Formatted error reporting and optional callback integration
-
-The schema must be defined as a nested dictionary, where each key represents a dataset,
-and each value describes column-level validation rules.
 """
 
 import pandas as pd
 import re
+import logging
 from copy import deepcopy
 from typing import Callable
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('logs.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
 try:
     from core.validator_func import FUNC
@@ -48,6 +57,7 @@ class Validator:
         """
         self._base_schema: dict[str, dict] = self._process_schema(base_schema)
         self._error_callback: Callable[[str, str], None] = error_callback
+        logger.info("Validator initialized with schema keys: %s", list(self._base_schema.keys()))
 
     def _process_schema(self, base_schema: dict[str, dict]) -> dict[str, dict]:
         """
@@ -60,6 +70,7 @@ class Validator:
         Returns:
             dict: A modified version ready for validation.
         """
+        logger.debug("Processing schema...")
         base_schema = deepcopy(base_schema)
 
         def _process_cfg(cfg: dict) -> None:
@@ -75,6 +86,7 @@ class Validator:
             for cfg in entry.values():
                 _process_cfg(cfg)
 
+        logger.debug("Schema processing complete.")
         return base_schema
 
     def _get_foreign_schema(self, cfg: dict) -> dict:
@@ -88,6 +100,7 @@ class Validator:
             dict: The resolved configuration from another schema.
         """
         entry, item = cfg["foreign"].split(".")
+        logger.debug(f"Resolving foreign schema reference: {entry}.{item}")
         foreign_schema = self._base_schema[entry][item]
 
         if "foreign" in foreign_schema:
@@ -108,24 +121,22 @@ class Validator:
         """
         DTYPE = {"float": "float64", "int": "int64"}
 
+        logger.info("Validating DataFrame header...")
         try:
-            df[:] = df[schema.keys()]  # Ensure columns are present and ordered
-
+            df[:] = df[schema.keys()]
             for (header, cfg), dtype in zip(schema.items(), df.dtypes):
-                type_ = (
-                    cfg["type"]
-                    if "foreign" not in cfg
-                    else self._get_foreign_schema(cfg)["type"]
-                )
+                type_ = cfg["type"] if "foreign" not in cfg else self._get_foreign_schema(cfg)["type"]
+                expected_dtype = DTYPE.get(type_, "object")
 
-                if dtype != DTYPE.get(type_, "object"):
-                    print(f"[FAIL] {header} has incorrect datatype")
+                if dtype != expected_dtype:
+                    logger.error(f"[FAIL] {header} has incorrect datatype (expected {expected_dtype}, got {dtype})")
                     return False
 
         except (KeyError, IndexError, Exception) as e:
-            print(f"[FAIL] {e}")
+            logger.error(f"[FAIL] Header validation error: {e}")
             return False
 
+        logger.info("Header validation passed.")
         return True
 
     def _validate_row(self, row: pd.Series, schema: dict) -> dict:
@@ -179,6 +190,7 @@ class Validator:
         Returns:
             str: A formatted string report.
         """
+        logger.debug("Formatting error report...")
         report_lines = []
 
         for idx, error_dict in errors.items():
@@ -203,8 +215,10 @@ class Validator:
         """
         key = filepath.replace("\\", "/").split("/")[-1].split(".")[0].lower()
         schema = self._base_schema[key]
+        logger.info(f"Validating file: {filepath} (inferred key: {key})")
 
         if not self._validate_header(df, schema):
+            logger.error(f"Validation failed: header mismatch in file {filepath}")
             return False
 
         errors = df.apply(lambda row: self._validate_row(row, schema), axis=1)
@@ -212,12 +226,14 @@ class Validator:
         errors = errors[errors.apply(bool)]
 
         if not errors.empty:
+            logger.warning(f"Validation failed: {len(errors)} invalid rows in {filepath}")
             report = self._format_error(invalid_rows, errors)
             if self._error_callback:
                 self._error_callback(filepath, report)
+        else:
+            logger.info(f"Validation passed: all rows valid in {filepath}")
 
         return errors.empty
-
 
 if __name__ == "__main__":
     """

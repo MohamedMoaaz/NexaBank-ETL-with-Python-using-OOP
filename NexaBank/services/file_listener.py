@@ -17,23 +17,29 @@ Dependencies:
 """
 
 import time
+import logging
 from threading import Timer, Thread
 from typing import Callable
 from pathlib import Path
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
+# === Configure logging ===
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.FileHandler("logs.log"),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
 
 class _FileEventHandler(FileSystemEventHandler):
     """
     A private class that handles file system events with debouncing capability.
     Inherits from watchdog's FileSystemEventHandler.
-
-    Attributes:
-        _delay (float): Time to wait before firing callback after modification.
-        _callback (Callable): Function to call after stable file write.
-        _timers (dict): Dictionary mapping file paths to debounce timers.
-        _filter (set): Set of filename stems to watch (e.g., 'customer_profiles').
     """
 
     def __init__(
@@ -42,51 +48,37 @@ class _FileEventHandler(FileSystemEventHandler):
         delay: float = 1.0,
         callback: Callable[[str], None] = None,
     ):
-        """
-        Initialize the event handler.
-
-        Args:
-            filter (tuple[str]): File name stems to monitor.
-            delay (float): Debounce delay in seconds.
-            callback (Callable): Function to call when a file is modified.
-        """
         super().__init__()
         self._delay = delay
         self._callback = callback
         self._timers: dict[str, Timer] = {}
         self._filter: set[str] = set(filter)
+        logger.info(f"FileEventHandler initialized with filters: {self._filter}, delay: {self._delay}s")
 
     def on_modified(self, event) -> None:
-        """
-        Handle file modification events with debouncing.
-        Ignores directory modifications and files not in the filter.
-
-        Args:
-            event: The file system event.
-        """
         if event.is_directory:
             return
 
         filepath = Path(event.src_path)
 
-        def handle_write_complete(fp: Path) -> None:
-            """
-            Callback wrapper to clean up and invoke the main callback.
-
-            Args:
-                fp (Path): The modified file.
-            """
-            if str(fp) in self._timers:
-                del self._timers[str(fp)]
-                if self._callback:
-                    self._callback(str(fp))
-
         if filepath.stem not in self._filter:
+            logger.debug(f"Ignored file: {filepath.name} (not in filter)")
             return
 
+        def handle_write_complete(fp: Path) -> None:
+            if str(fp) in self._timers:
+                del self._timers[str(fp)]
+                logger.info(f"File write completed: {fp}")
+                if self._callback:
+                    logger.debug(f"Invoking callback for: {fp}")
+                    self._callback(str(fp))
+
+        # Cancel existing timer if file is modified again quickly
         if str(filepath) in self._timers:
+            logger.debug(f"Resetting debounce timer for: {filepath}")
             self._timers[str(filepath)].cancel()
 
+        logger.info(f"Detected file change: {filepath}")
         timer = Timer(self._delay, lambda: handle_write_complete(filepath))
         self._timers[str(filepath)] = timer
         timer.start()
@@ -96,12 +88,6 @@ class FileListener:
     """
     A class that monitors file system changes in a specified directory.
     Supports filtering by filename and callback execution on file modifications.
-
-    Attributes:
-        _path (str): The directory to monitor.
-        _handler (_FileEventHandler): Internal handler for file change events.
-        _observer (Observer): Watchdog observer.
-        _thread (Thread | None): Thread object used when running as a background task.
     """
 
     def __init__(
@@ -110,50 +96,28 @@ class FileListener:
         filter: tuple[str] = tuple(),
         callback: Callable[[str], None] = None,
     ):
-        """
-        Initialize the file listener.
-
-        Args:
-            path (str): Directory path to monitor.
-            filter (tuple[str]): File name stems to filter (without extensions).
-            callback (Callable): Function to call when file is modified.
-        """
         self._path = path
         self._handler = _FileEventHandler(filter, delay=1.0, callback=callback)
         self._observer = Observer()
         self._observer.schedule(self._handler, path=path, recursive=True)
         self._thread: Thread | None = None
+        logger.info(f"FileListener initialized on path: {self._path}")
 
     def loop(self) -> None:
-        """
-        Start the file system observer and run a blocking loop.
-        Use this in the main thread if you want synchronous execution.
-        """
         self._observer.start()
+        logger.info(f"FileListener loop started (watching: {self._path})")
 
         try:
-            print(f"[INFO] Watching changes in: {self._path}")
             while True:
                 time.sleep(1)
         except KeyboardInterrupt:
+            logger.warning("FileListener loop interrupted by user.")
             self._observer.stop()
         finally:
             self._observer.join()
+            logger.info("FileListener loop stopped.")
 
     def start_thread(self) -> None:
-        """
-        Start the file listener loop in a daemon background thread.
-        Use this for non-blocking monitoring.
-        """
         self._thread = Thread(target=self.loop, daemon=True)
         self._thread.start()
-
-
-if __name__ == "__main__":
-    def test_function(filepath: str) -> None:
-        """Test callback function that prints the modified file path."""
-        print(f"File modified: {filepath}")
-
-    # Example usage
-    listener = FileListener("./incoming_data", callback=test_function)
-    listener.loop()
+        logger.info("FileListener started in background thread.")
