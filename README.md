@@ -33,8 +33,17 @@ The `extract()` method returns:
 ```python```
 (success: bool, dataframe: pd.DataFrame | None)
 
-🪵 Logging
+---
+
+### 🪵 Logging
+
 Logging is configured to:
-Print messages to the console (stdout)
-Save logs to a file (logs.log)
-Both high-level status messages and detailed debug information (e.g., DataFrame shape) are recorded.
+
+- **Print to console** (`stdout`) for real-time feedback  
+- **Write to file** (`logs.log`) for persistent log history
+
+The logger captures both:
+
+- **High-level messages** — e.g., success or failure of extraction  
+- **Detailed debug info** — e.g., the shape of the extracted DataFrame
+
