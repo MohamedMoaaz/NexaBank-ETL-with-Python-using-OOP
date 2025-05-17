@@ -47,3 +47,39 @@ The logger captures both:
 - **High-level messages** — e.g., success or failure of extraction  
 - **Detailed debug info** — e.g., the shape of the extracted DataFrame
 
+----
+
+# 📦 Transformers Module
+
+The `transformers` module is responsible for extracting metadata from file paths and applying transformation logic to raw datasets. It is intended to be used as part of a larger ETL or data warehousing pipeline.
+
+---
+
+## 📁 Expected File Structure
+
+The module assumes input files are organized as follows:
+
+/<base_path>/landing/YYYY-MM-DD/HH/filename.csv
+
+**Example:**
+/data/landing/2025-05-17/14/deliveries.csv
+
+Where:
+
+- `YYYY-MM-DD` is the date of the data load
+- `HH` is the hour (24-hour format)
+- `filename.csv` is the name of the dataset
+
+---
+
+## 🧠 Overview
+
+The `Transformer` class provides the following core functionality:
+
+- Extract dataset key (e.g., `"deliveries"`) from file paths
+- Extract timestamp metadata (e.g., date and hour) from file paths
+- Apply business logic transformations (e.g., calculate fines based on delivery delays)
+
+---
+
+
