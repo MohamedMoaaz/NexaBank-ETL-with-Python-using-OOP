@@ -12,7 +12,7 @@ from pathlib import Path
 
 # Configure logging
 logging.basicConfig(
-    level=logging.ERROR,
+    level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.FileHandler('logs.log'),
@@ -65,14 +65,7 @@ class Transformer:
             df["tenure"] = tenure.astype(int)
             logger.debug(f"Calculated tenure (min: {df['tenure'].min()}, max: {df['tenure'].max()})")
 
-            def classify_customer_segment(value):
-                if value > 5:
-                    return "Loyal"
-                elif value < 1:
-                    return "Newcomer"
-                return "Normal"
-
-            df["customer_segment"] = df["tenure"].apply(classify_customer_segment)
+            df["customer_segment"] = df["tenure"].apply(lambda x: "Loyal" if x > 5 else "Newcomer" if x < 1 else "Normal")
             segment_counts = df["customer_segment"].value_counts().to_dict()
             logger.debug(f"Customer segments created: {segment_counts}")
             
@@ -106,11 +99,12 @@ class Transformer:
             paid_percentage = df["fully_paid"].mean() * 100
             logger.debug(f"Fully paid percentage: {paid_percentage:.2f}%")
 
-            df["debt"] = (df["amount_due"] - df["amount_paid"]).clip(lower=0).astype(int)
+            df["debt"] = df.apply(lambda row: 0 if row["fully_paid"] else row["amount_due"] - row["amount_paid"], axis=1)
             logger.debug(f"Total debt: {df['debt'].sum()}")
 
-            due_date = pd.to_datetime(df["month"], format="%Y-%m")
-            df["late_days"] = (pd.to_datetime(df["payment_date"]) - due_date).dt.days
+            df["due_date"] = pd.to_datetime(df["month"] + "-01")
+            df["payment_date"] = pd.to_datetime(df["payment_date"])
+            df["late_days"] = (df["payment_date"] - df["due_date"]).dt.days.astype(int)
             df["fine"] = df["late_days"].clip(lower=0) * 5.15
             df["total_amount"] = df["amount_due"] + df["fine"]
             
@@ -189,7 +183,7 @@ if __name__ == "__main__":
     """Example usage with logging."""
     from extractor import Extractor
 
-    filepath = "incoming_data/2025-04-29/21/loans.txt"
+    filepath = r"E:\incoming_data\2025-04-18\14\loans.txt"
     logger.info(f"Starting transformation example for {filepath}")
 
     try:
