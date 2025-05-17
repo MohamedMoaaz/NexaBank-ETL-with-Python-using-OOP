@@ -8,14 +8,14 @@ TXT (.txt) – Typically pipe-delimited, but supports auto-detection
 JSON (.json) – Records-oriented JSON (a list of objects/dictionaries)
 
 🧠 Key Features
-Automatic delimiter detection for .csv and .txt using csv.Sniffer
-Reads JSON in records format with pandas.read_json(..., orient="records")
-Comprehensive error handling for:
-Missing or empty files
-Malformed JSON
-Parsing issues
-File encoding errors
-Integrated logging to both console and file (logs.log) with clear, structured messages
+- Automatic delimiter detection for .csv and .txt using csv.Sniffer
+- Reads JSON in records format with pandas.read_json(..., orient="records")
+- Comprehensive error handling for:
+    Missing or empty files
+    Malformed JSON
+    Parsing issues
+    File encoding errors
+    Integrated logging to both console and file (logs.log) with clear, structured messages
 
 🔄 Return Value
 The extract() method returns:
