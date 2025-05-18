@@ -121,3 +121,16 @@ class FileListener:
         self._thread = Thread(target=self.loop, daemon=True)
         self._thread.start()
         logger.info("FileListener started in background thread.")
+
+if __name__ == "__main__":
+    # Example usage
+    def example_callback(filepath: str) -> None:
+        logger.info(f"Callback executed for file: {filepath}")
+
+    listener = FileListener(
+        path="./incoming_data",
+        filter=("customer_profiles", "support_tickets", "credit_cards_billing", "loans", "transactions"),
+        callback=example_callback
+    )
+    listener.start_thread()
+    # listener.loop()  # This will block the main thread

@@ -253,7 +253,7 @@ if __name__ == "__main__":
         print(filename)
         print(report)
 
-    filepath = "incoming_data/2025-04-29/21/transactions.json"
+    filepath = "incoming_data/2025-05-18/11/customer_profiles.csv"
     extractor = Extractor()
     flag, data = extractor.extract(filepath)
     print(f"> Extractor: {flag}")

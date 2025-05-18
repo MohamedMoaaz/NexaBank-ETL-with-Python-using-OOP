@@ -92,13 +92,13 @@ class FolderStatus:
 
     def __setitem__(self, key: str, value: bool) -> None:
         """
-        Set status flags (not implemented fully in this version).
+        Set status flags.
 
         Args:
             key (str): File path
-            value (bool): New status flag (ignored in current logic)
+            value (bool): New status flag
         """
-        self[key] = value  # Note: this is a no-op and recursive call
+        self[key] = value
 
     def update(self) -> None:
         """
@@ -167,13 +167,13 @@ class FolderStatusHandler:
 
     def __setitem__(self, key: str, value: bool) -> None:
         """
-        Set status flags (currently not fully implemented).
+        Set status flags.
 
         Args:
             key (str): File path
-            value (bool): Status value (unused)
+            value (bool): Status value
         """
-        self[key] = value  # No-op
+        self[key] = value
 
     def update(self, key: str) -> None:
         """
@@ -186,7 +186,7 @@ class FolderStatusHandler:
 
 
 if __name__ == "__main__":
-    path = "incoming_data/2025-04-29/21/credit_cards_billing.csv"
+    path = "incoming_data/2025-05-18/19/customer_profiles.csv"
     headers = ("customer_profiles", "support_tickets", "credit_cards_billing", "loans", "transactions")
     status = FolderStatusHandler(headers)
     status[path]["saved"] = None
