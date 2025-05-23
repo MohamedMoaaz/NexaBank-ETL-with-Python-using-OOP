@@ -6,23 +6,24 @@ to load structured data from various file formats into a pandas DataFrame.
 
 Supported file types:
 - CSV (.csv)
-- Pipe-delimited TXT (.txt)
+- All delimited TXT (.txt)
 - JSON (.json, records-oriented)
 
 The `extract` method handles exceptions gracefully and returns a success flag
 along with the DataFrame (if extraction is successful).
 """
 
-import pandas as pd
+import pandas as pd 
 import json
 import logging
 from typing import Tuple
 from pathlib import Path
 import sys
+import csv
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.FileHandler('logs.log'),
@@ -53,7 +54,7 @@ class Extractor:
                 - A pandas DataFrame if extraction was successful, otherwise None.
 
         Supported formats:
-            - .txt: Pipe-delimited text files
+            - .txt: All delimited text files
             - .csv: Comma-separated values
             - .json: JSON files in records format
         """
@@ -64,12 +65,16 @@ class Extractor:
             extension = Path(filepath).suffix[1:].lower()  # More robust path handling
             
             match extension:
-                case "txt":
-                    logger.debug("Processing pipe-delimited text file")
-                    df = pd.read_csv(filepath, delimiter="|")
-                case "csv":
-                    logger.debug("Processing CSV file")
-                    df = pd.read_csv(filepath)
+                case "csv" | "txt":
+                    with open(filepath, "r") as f:
+                        sample = f.read(2048)
+                        try:
+                            dialect = csv.Sniffer().sniff(sample)
+                            delimiter = dialect.delimiter
+                        except csv.Error:
+                            delimiter = ","  # Fallback to comma if detection fails
+                        f.seek(0)
+                        df = pd.read_csv(f, delimiter=delimiter)
                 case "json":
                     logger.debug("Processing JSON file")
                     df = pd.read_json(filepath, orient="records")
@@ -110,7 +115,7 @@ class Extractor:
 
 if __name__ == "__main__":
     # Example usage
-    filepath = "incoming_data/2025-05-14/21/customer_profiles.csv"
+    filepath = r"E:\incoming_data\2025-04-18\14\customer_profiles.csv"
     success, dataframe = Extractor.extract(filepath)
     
     logger.info(f"Extraction {'successful' if success else 'failed'}")
