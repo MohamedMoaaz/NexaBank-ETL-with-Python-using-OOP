@@ -232,7 +232,7 @@ class Validator:
                 self._error_callback(filepath, report)
         else:
             logger.info(f"Validation passed: all rows valid in {filepath}")
-
+        
         return errors.empty
 
 if __name__ == "__main__":

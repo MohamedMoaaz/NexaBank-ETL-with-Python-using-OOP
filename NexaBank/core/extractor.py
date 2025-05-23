@@ -72,7 +72,7 @@ class Extractor:
                             dialect = csv.Sniffer().sniff(sample)
                             delimiter = dialect.delimiter
                         except csv.Error:
-                            delimiter = ","  # Fallback to comma if detection fails
+                            delimiter = ","
                         f.seek(0)
                         df = pd.read_csv(f, delimiter=delimiter)
                 case "json":
@@ -83,7 +83,7 @@ class Extractor:
                     logger.error(error_msg)
                     return (False, None)
 
-            # Log successful extraction
+            
             logger.info(f"Successfully extracted data from {filepath}")
             logger.debug(f"Extracted DataFrame shape: {df.shape}")
             return (True, df)
