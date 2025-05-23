@@ -98,7 +98,8 @@ class FolderStatus:
             key (str): File path
             value (bool): New status flag
         """
-        self[key] = value
+        file_key = self._key(key)
+        self._status[file_key] = value
 
     def update(self) -> None:
         """
@@ -173,7 +174,8 @@ class FolderStatusHandler:
             key (str): File path
             value (bool): Status value
         """
-        self[key] = value
+        self._check(key)
+        self._folders[self._key(key)].__setitem__(key, value)
 
     def update(self, key: str) -> None:
         """
